@@ -32,6 +32,11 @@ from hermes_cli.setup import (
 
 logger = logging.getLogger(__name__)
 
+# Max chars of archived IDENTITY.md to print after migration (suggested merge into SOUL.md).
+_IDENTITY_PREVIEW_MAX_CHARS = 8000
+# BOOTSTRAP is first-run only — short preview so users can turn it into a one-off skill.
+_BOOTSTRAP_PREVIEW_MAX_CHARS = 2500
+
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 _OPENCLAW_SCRIPT = (
@@ -542,9 +547,57 @@ def _cmd_migrate(args):
     # Print results
     _print_migration_report(report, dry_run=False)
 
-    # Source directory is left untouched — archiving is not the migration
-    # tool's responsibility.  Users who want to clean up can run
-    # 'hermes claw cleanup' separately.
+    if not dry_run:
+        _maybe_print_archived_identity_hint(report)
+        _maybe_print_archived_bootstrap_hint(report)
+
+    # After successful non-dry-run migration, offer to archive the source directory
+    if not dry_run and report.get("summary", {}).get("migrated", 0) > 0:
+        _offer_source_archival(source_dir, getattr(args, "yes", False))
+
+
+def _offer_source_archival(source_dir: Path, auto_yes: bool = False):
+    """After migration, offer to rename the source directory to prevent state fragmentation.
+
+    OpenClaw workspace directories contain state files (todo.json, sessions, etc.)
+    that the agent may discover and write to, causing confusion. Renaming the
+    directory prevents this.
+    """
+    if not source_dir.is_dir():
+        return
+
+    # Scan for state files that could cause problems
+    state_files = _scan_workspace_state(source_dir)
+
+    print()
+    print_header("Post-Migration Cleanup")
+    print_info("The OpenClaw directory still exists and contains workspace state files")
+    print_info("that can confuse the agent (todo lists, sessions, logs).")
+    if state_files:
+        print()
+        print(color("  Found state files:", Colors.YELLOW))
+        # Show up to 10 most relevant findings
+        for path, desc in state_files[:10]:
+            print(f"      {desc}")
+        if len(state_files) > 10:
+            print(f"      ... and {len(state_files) - 10} more")
+    print()
+    print_info(f"Recommend: rename {source_dir.name}/ to {source_dir.name}.pre-migration/")
+    print_info("This prevents the agent from discovering old workspace directories.")
+    print_info("You can always rename it back if needed.")
+    print()
+
+    if auto_yes or prompt_yes_no(f"Archive {source_dir} now?", default=True):
+        try:
+            archive_path = _archive_directory(source_dir)
+            print_success(f"Archived: {source_dir} → {archive_path}")
+            print_info("The original directory has been renamed, not deleted.")
+            print_info(f"To undo: mv {archive_path} {source_dir}")
+        except OSError as e:
+            print_error(f"Could not archive: {e}")
+            print_info(f"You can do it manually: mv {source_dir} {source_dir}.pre-migration")
+    else:
+        print_info("Skipped. You can archive later with: hermes claw cleanup")
 
 
 def _cmd_cleanup(args):
@@ -684,6 +737,87 @@ def _cmd_cleanup(args):
         print_info("Directories were renamed, not deleted. You can undo by renaming them back.")
     else:
         print_info("No directories were archived.")
+
+
+def _maybe_print_archived_identity_hint(report: dict) -> None:
+    """If migration archived workspace IDENTITY.md, print a suggested paste for SOUL.md."""
+    od = report.get("output_dir")
+    if not od:
+        return
+    base = Path(od) / "archive"
+    candidates = [
+        base / "workspace" / "IDENTITY.md",
+        base / "workspace.default" / "IDENTITY.md",
+    ]
+    identity_path = next((p for p in candidates if p.is_file()), None)
+    if not identity_path:
+        return
+    try:
+        content = identity_path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return
+    if not content:
+        return
+
+    print()
+    print_header("Archived IDENTITY.md — merge into SOUL.md")
+    print_info("Hermes has no separate IDENTITY.md. Add the text below under a ## Identity heading (or merge into your existing SOUL.md).")
+    print_info(f"Source: {identity_path}")
+    print()
+    preview = content
+    if len(preview) > _IDENTITY_PREVIEW_MAX_CHARS:
+        preview = (
+            preview[:_IDENTITY_PREVIEW_MAX_CHARS].rstrip()
+            + "\n\n[... truncated — edit from the archive file above ...]"
+        )
+    print(color("--- suggested paste (edit freely) ---", Colors.DIM))
+    print(preview)
+    print(color("--- end suggested paste ---", Colors.DIM))
+    print()
+    soul = get_hermes_home() / "SOUL.md"
+    print_info(f"Typical target: {soul}")
+
+
+def _maybe_print_archived_bootstrap_hint(report: dict) -> None:
+    """If migration archived BOOTSTRAP.md, explain first-run skill workflow (never persistent prompt)."""
+    od = report.get("output_dir")
+    if not od:
+        return
+    base = Path(od) / "archive"
+    candidates = [
+        base / "workspace" / "BOOTSTRAP.md",
+        base / "workspace.default" / "BOOTSTRAP.md",
+    ]
+    bootstrap_path = next((p for p in candidates if p.is_file()), None)
+    if not bootstrap_path:
+        return
+    try:
+        content = bootstrap_path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return
+    if not content:
+        return
+
+    print()
+    print_header("Archived BOOTSTRAP.md — first-run only (not a standing prompt)")
+    print_info(
+        "Hermes does not inject BOOTSTRAP.md on every session. "
+        "Turn this into a one-time skill, run it once, then remove or archive the skill."
+    )
+    print_info("Suggested path: ~/.hermes/skills/openclaw-bootstrap/SKILL.md (or a profile under HERMES_HOME/skills/)")
+    print_info(f"Source: {bootstrap_path}")
+    print()
+    preview = content
+    if len(preview) > _BOOTSTRAP_PREVIEW_MAX_CHARS:
+        preview = (
+            preview[:_BOOTSTRAP_PREVIEW_MAX_CHARS].rstrip()
+            + "\n\n[... truncated — copy from archive file ...]"
+        )
+    print(color("--- content reference (paste into SKILL.md body if useful) ---", Colors.DIM))
+    print(preview)
+    print(color("--- end reference ---", Colors.DIM))
+    print()
+    print_info("See: https://hermes-agent.nousresearch.com/docs/guides/openclaw-hermes-security-profiles")
 
 
 def _print_migration_report(report: dict, dry_run: bool):

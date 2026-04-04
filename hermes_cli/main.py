@@ -7603,6 +7603,10 @@ def cmd_profile(args):
             print(f"  {name} setup              Configure API keys and model")
             print(f"  {name} chat               Start chatting")
             print(f"  {name} gateway start      Start the messaging gateway")
+            print(
+                "\n  OpenClaw-style hybrid (identity, SOUL, cron, profiles):\n"
+                "  https://hermes-agent.nousresearch.com/docs/guides/openclaw-hermes-hybrid"
+            )
             if clone or clone_all:
                 print(f"\n  Edit {profile_dir_display}/.env for different API keys")
                 print(f"  Edit {profile_dir_display}/SOUL.md for different personality")

@@ -40,14 +40,6 @@ from types import SimpleNamespace
 import urllib.request
 import uuid
 from typing import List, Dict, Any, Optional
-from urllib.parse import urlparse, parse_qs, urlunparse
-# NOTE: `from openai import OpenAI` is deliberately NOT at module top — the
-# SDK pulls ~240 ms of imports. We expose `OpenAI` as a thin proxy object
-# that imports the SDK on first call/isinstance check. This preserves:
-#   (a) the single in-module `OpenAI(**client_kwargs)` call site at
-#       _create_openai_client, and
-#   (b) `patch("run_agent.OpenAI", ...)` test patterns used by ~28 test files.
-import fire
 from datetime import datetime
 from pathlib import Path
 
@@ -13742,4 +13734,7 @@ def main(
 
 
 if __name__ == "__main__":
+    # Lazy import so `import run_agent` (e.g. tests) does not require optional `fire`.
+    import fire
+
     fire.Fire(main)
