@@ -18,9 +18,12 @@ Hermes Agent automatically discovers and loads context files that shape how it b
 | **SOUL.md** | Global personality and tone customization for this Hermes instance | `HERMES_HOME/SOUL.md` only |
 | **.cursorrules** | Cursor IDE coding conventions | CWD only |
 | **.cursor/rules/*.mdc** | Cursor IDE rule modules | CWD only |
+| **TOOLS.md** / **tools.md** | Tool and workflow hints (OpenClaw-style) | Project: CWD first (`TOOLS.md` preferred over `tools.md`); global: `HERMES_HOME/TOOLS.md` |
+| **HEARTBEAT.md** | Session checklist / standing reminders | `HERMES_HOME/HEARTBEAT.md` only |
+| **Daily memory** | Dated notes for continuity | `HERMES_HOME/memory/daily/YYYY-MM-DD.md` (today and yesterday) |
 
 :::info Priority system
-Only **one** project context type is loaded per session (first match wins): `.hermes.md` → `AGENTS.md` → `CLAUDE.md` → `.cursorrules`. **SOUL.md** is always loaded independently as the agent identity (slot #1).
+Only **one** project context type is loaded per session (first match wins): `.hermes.md` → `AGENTS.md` → `CLAUDE.md` → `.cursorrules`. After that, optional **TOOLS.md** sections are appended (CWD, then `HERMES_HOME`), then **SOUL.md** as the agent identity when not already loaded as slot #1, then **HEARTBEAT.md** and **daily memory** (unless the session `platform` is `cron` — scheduled jobs skip heartbeat and daily notes so checklists do not inflate cron prompts).
 :::
 
 ## AGENTS.md
@@ -100,11 +103,11 @@ This means your existing Cursor conventions automatically apply when using Herme
 
 Context files are loaded by `build_context_files_prompt()` in `agent/prompt_builder.py`:
 
-1. **At session start** — the function scans the working directory
+1. **At session start** — the function scans the working directory (and reads global files from `HERMES_HOME`)
 2. **Content is read** — each file is read as UTF-8 text
 3. **Security scan** — content is checked for prompt injection patterns
-4. **Truncation** — files exceeding 20,000 characters are head/tail truncated (70% head, 20% tail, with a marker in the middle)
-5. **Assembly** — all sections are combined under a `# Project Context` header
+4. **Truncation** — project context files use 20,000 characters (head/tail truncated); `HEARTBEAT.md`, `TOOLS.md`, and daily memory use separate caps (see Size Limits)
+5. **Assembly** — sections are combined under a `# Project Context` header in order: single project context file (if any), CWD `TOOLS.md`, `HERMES_HOME/TOOLS.md`, `SOUL.md` (unless already injected as identity), then `HEARTBEAT.md` and daily memory (skipped when `platform` is `cron`)
 6. **Injection** — the assembled content is added to the system prompt
 
 The final prompt section looks roughly like:
@@ -154,7 +157,11 @@ This scanner protects against common injection patterns, but it's not a substitu
 
 | Limit | Value |
 |-------|-------|
-| Max chars per file | 20,000 (~7,000 tokens) |
+| Max chars per project context file | 20,000 (~7,000 tokens) |
+| `HEARTBEAT.md` max chars | 4,000 |
+| `TOOLS.md` max chars (per file) | 12,000 |
+| Daily memory max per file | 8,000 |
+| Daily memory combined max | 16,000 |
 | Head truncation ratio | 70% |
 | Tail truncation ratio | 20% |
 | Truncation marker | 10% (shows char counts and suggests using file tools) |

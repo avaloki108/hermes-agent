@@ -140,6 +140,8 @@ const sidebars: SidebarsConfig = {
         'guides/use-soul-with-hermes',
         'guides/use-voice-mode-with-hermes',
         'guides/migrate-from-openclaw',
+        'guides/openclaw-hermes-hybrid',
+        'guides/openclaw-hermes-security-profiles',
       ],
     },
     {
