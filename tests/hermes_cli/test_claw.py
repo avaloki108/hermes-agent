@@ -700,3 +700,83 @@ class TestPrintMigrationReport:
         claw_mod._print_migration_report(report, dry_run=False)
         captured = capsys.readouterr()
         assert "Nothing to migrate" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# _maybe_print_archived_identity_hint
+# ---------------------------------------------------------------------------
+
+
+class TestMaybePrintArchivedIdentityHint:
+    """Suggested SOUL merge when migration archives IDENTITY.md."""
+
+    def test_skips_when_no_output_dir(self, capsys):
+        claw_mod._maybe_print_archived_identity_hint({})
+        assert capsys.readouterr().out == ""
+
+    def test_skips_when_identity_missing(self, tmp_path, capsys):
+        report = {"output_dir": str(tmp_path)}
+        claw_mod._maybe_print_archived_identity_hint(report)
+        assert capsys.readouterr().out == ""
+
+    def test_prints_hint_when_identity_archived(self, tmp_path, capsys):
+        arch = tmp_path / "archive" / "workspace"
+        arch.mkdir(parents=True)
+        (arch / "IDENTITY.md").write_text("## Name\nTestBot\n", encoding="utf-8")
+        report = {"output_dir": str(tmp_path)}
+        with patch.object(claw_mod, "get_hermes_home", return_value=tmp_path / "hermes"):
+            claw_mod._maybe_print_archived_identity_hint(report)
+        out = capsys.readouterr().out
+        assert "Archived IDENTITY.md" in out
+        assert "TestBot" in out
+        assert "SOUL.md" in out
+
+    def test_truncates_long_identity(self, tmp_path, capsys):
+        arch = tmp_path / "archive" / "workspace"
+        arch.mkdir(parents=True)
+        long_body = "x" * (claw_mod._IDENTITY_PREVIEW_MAX_CHARS + 500)
+        (arch / "IDENTITY.md").write_text(long_body, encoding="utf-8")
+        report = {"output_dir": str(tmp_path)}
+        with patch.object(claw_mod, "get_hermes_home", return_value=tmp_path / "hermes"):
+            claw_mod._maybe_print_archived_identity_hint(report)
+        out = capsys.readouterr().out
+        assert "truncated" in out
+
+
+# ---------------------------------------------------------------------------
+# _maybe_print_archived_bootstrap_hint
+# ---------------------------------------------------------------------------
+
+
+class TestMaybePrintArchivedBootstrapHint:
+    """First-run skill workflow when migration archives BOOTSTRAP.md."""
+
+    def test_skips_when_no_output_dir(self, capsys):
+        claw_mod._maybe_print_archived_bootstrap_hint({})
+        assert capsys.readouterr().out == ""
+
+    def test_skips_when_bootstrap_missing(self, tmp_path, capsys):
+        report = {"output_dir": str(tmp_path)}
+        claw_mod._maybe_print_archived_bootstrap_hint(report)
+        assert capsys.readouterr().out == ""
+
+    def test_prints_hint_when_bootstrap_archived(self, tmp_path, capsys):
+        arch = tmp_path / "archive" / "workspace"
+        arch.mkdir(parents=True)
+        (arch / "BOOTSTRAP.md").write_text("## Setup\nRun forge build once.\n", encoding="utf-8")
+        report = {"output_dir": str(tmp_path)}
+        claw_mod._maybe_print_archived_bootstrap_hint(report)
+        out = capsys.readouterr().out
+        assert "Archived BOOTSTRAP.md" in out
+        assert "forge build" in out
+        assert "one-time skill" in out.lower() or "one-time" in out.lower()
+
+    def test_truncates_long_bootstrap(self, tmp_path, capsys):
+        arch = tmp_path / "archive" / "workspace"
+        arch.mkdir(parents=True)
+        long_body = "y" * (claw_mod._BOOTSTRAP_PREVIEW_MAX_CHARS + 400)
+        (arch / "BOOTSTRAP.md").write_text(long_body, encoding="utf-8")
+        report = {"output_dir": str(tmp_path)}
+        claw_mod._maybe_print_archived_bootstrap_hint(report)
+        out = capsys.readouterr().out
+        assert "truncated" in out

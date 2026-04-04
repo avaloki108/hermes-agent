@@ -41,7 +41,6 @@ from types import SimpleNamespace
 import uuid
 from typing import List, Dict, Any, Optional
 from openai import OpenAI
-import fire
 from datetime import datetime
 from pathlib import Path
 
@@ -8918,4 +8917,7 @@ def main(
 
 
 if __name__ == "__main__":
+    # Lazy import so `import run_agent` (e.g. tests) does not require optional `fire`.
+    import fire
+
     fire.Fire(main)

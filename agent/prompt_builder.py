@@ -10,6 +10,7 @@ import os
 import re
 import threading
 from collections import OrderedDict
+from datetime import date, timedelta
 from pathlib import Path
 
 from hermes_constants import get_hermes_home
@@ -290,6 +291,12 @@ PLATFORM_HINTS = {
 CONTEXT_FILE_MAX_CHARS = 20_000
 CONTEXT_TRUNCATE_HEAD_RATIO = 0.7
 CONTEXT_TRUNCATE_TAIL_RATIO = 0.2
+
+# OpenClaw-style optional files under HERMES_HOME / cwd (session-start only; cache-safe).
+HEARTBEAT_MAX_CHARS = 4_000
+TOOLS_MD_MAX_CHARS = 12_000
+DAILY_MEMORY_MAX_PER_FILE = 8_000
+DAILY_MEMORY_COMBINED_MAX = 16_000
 
 
 # =========================================================================
@@ -793,6 +800,83 @@ def load_soul_md() -> Optional[str]:
         return None
 
 
+
+
+def load_heartbeat_md() -> str:
+    """Load HEARTBEAT.md from HERMES_HOME (OpenClaw-style session checklist)."""
+    heartbeat_path = get_hermes_home() / "HEARTBEAT.md"
+    if not heartbeat_path.is_file():
+        return ""
+    try:
+        content = heartbeat_path.read_text(encoding="utf-8").strip()
+        if not content:
+            return ""
+        content = _scan_context_content(content, "HEARTBEAT.md")
+        content = _truncate_content(content, "HEARTBEAT.md", max_chars=HEARTBEAT_MAX_CHARS)
+        return "## HEARTBEAT.md\n\n" + content
+    except Exception as e:
+        logger.debug("Could not read HEARTBEAT.md from %s: %s", heartbeat_path, e)
+        return ""
+
+
+def _load_tools_md_from_path(path: Path, label: str) -> str:
+    """Load a TOOLS.md-style file with scan + per-file cap."""
+    if not path.is_file():
+        return ""
+    try:
+        content = path.read_text(encoding="utf-8").strip()
+        if not content:
+            return ""
+        content = _scan_context_content(content, label)
+        content = _truncate_content(content, label, max_chars=TOOLS_MD_MAX_CHARS)
+        return f"## {label}\n\n{content}"
+    except Exception as e:
+        logger.debug("Could not read %s: %s", path, e)
+        return ""
+
+
+def load_hermes_home_tools_md() -> str:
+    """HERMES_HOME/TOOLS.md (global tool hints)."""
+    return _load_tools_md_from_path(get_hermes_home() / "TOOLS.md", "TOOLS.md")
+
+
+def load_cwd_tools_md(cwd_path: Path) -> str:
+    """Project TOOLS.md or tools.md in *cwd_path* (cwd wins first match)."""
+    for name in ("TOOLS.md", "tools.md"):
+        candidate = cwd_path / name
+        if candidate.is_file():
+            return _load_tools_md_from_path(candidate, name)
+    return ""
+
+
+def load_daily_memory_markdown() -> str:
+    """Today and yesterday daily notes under HERMES_HOME/memory/daily/."""
+    from hermes_time import now
+
+    today = now().date()
+    yesterday = today - timedelta(days=1)
+    daily_dir = get_hermes_home() / "memory" / "daily"
+    parts: list[str] = []
+    for day in (today, yesterday):
+        note_path = daily_dir / f"{day.isoformat()}.md"
+        if not note_path.is_file():
+            continue
+        try:
+            content = note_path.read_text(encoding="utf-8").strip()
+            if not content:
+                continue
+            content = _scan_context_content(content, note_path.name)
+            content = _truncate_content(content, note_path.name, max_chars=DAILY_MEMORY_MAX_PER_FILE)
+            parts.append(f"### {day.isoformat()}\n\n{content}")
+        except Exception as e:
+            logger.debug("Could not read daily memory %s: %s", note_path, e)
+    if not parts:
+        return ""
+    body = "\n\n".join(parts)
+    body = _truncate_content(body, "daily memory", max_chars=DAILY_MEMORY_COMBINED_MAX)
+    return "## Daily memory\n\n" + body
+
+
 def _load_hermes_md(cwd_path: Path) -> str:
     """.hermes.md / HERMES.md — walk to git root."""
     hermes_md_path = _find_hermes_md(cwd_path)
@@ -878,7 +962,11 @@ def _load_cursorrules(cwd_path: Path) -> str:
     return _truncate_content(cursorrules_content, ".cursorrules")
 
 
-def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = False) -> str:
+def build_context_files_prompt(
+    cwd: Optional[str] = None,
+    skip_soul: bool = False,
+    platform: Optional[str] = None,
+) -> str:
     """Discover and load context files for the system prompt.
 
     Priority (first found wins — only ONE project context type is loaded):
@@ -887,17 +975,23 @@ def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = Fals
       3. CLAUDE.md / claude.md   (cwd only)
       4. .cursorrules / .cursor/rules/*.mdc  (cwd only)
 
-    SOUL.md from HERMES_HOME is independent and always included when present.
-    Each context source is capped at 20,000 chars.
+    Additionally loads OpenClaw-style optional files: cwd ``TOOLS.md`` /
+    ``tools.md``, ``HERMES_HOME/TOOLS.md``, ``HERMES_HOME/HEARTBEAT.md``, and
+    daily memory notes — except when *platform* is ``cron``, which skips
+    heartbeat and daily memory (scheduled jobs should not inherit session
+    checklists).
 
-    When *skip_soul* is True, SOUL.md is not included here (it was already
-    loaded via ``load_soul_md()`` for the identity slot).
+    SOUL.md from HERMES_HOME is included when present unless *skip_soul* is True
+    (already loaded as identity). Project context sources use ``CONTEXT_FILE_MAX_CHARS``;
+    heartbeat, tools, and daily memory use dedicated caps.
     """
     if cwd is None:
         cwd = os.getcwd()
 
     cwd_path = Path(cwd).resolve()
-    sections = []
+    plat = (platform or "").lower().strip()
+    is_cron = plat == "cron"
+    sections: list[str] = []
 
     # Priority-based project context: first match wins
     project_context = (
@@ -909,12 +1003,32 @@ def build_context_files_prompt(cwd: Optional[str] = None, skip_soul: bool = Fals
     if project_context:
         sections.append(project_context)
 
+    cwd_tools = load_cwd_tools_md(cwd_path)
+    if cwd_tools:
+        sections.append(cwd_tools)
+
+    home_tools = load_hermes_home_tools_md()
+    if home_tools:
+        sections.append(home_tools)
+
     # SOUL.md from HERMES_HOME only — skip when already loaded as identity
     if not skip_soul:
         soul_content = load_soul_md()
         if soul_content:
             sections.append(soul_content)
 
+    if not is_cron:
+        heartbeat_section = load_heartbeat_md()
+        if heartbeat_section:
+            sections.append(heartbeat_section)
+        daily_section = load_daily_memory_markdown()
+        if daily_section:
+            sections.append(daily_section)
+
     if not sections:
         return ""
-    return "# Project Context\n\nThe following project context files have been loaded and should be followed:\n\n" + "\n".join(sections)
+    return (
+        "# Project Context\n\n"
+        "The following project context files have been loaded and should be followed:\n\n"
+        + "\n\n".join(sections)
+    )

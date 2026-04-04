@@ -670,6 +670,68 @@ class TestBuildContextFilesPrompt:
         assert "ESLint" in result
 
 
+    def test_loads_heartbeat_md(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        (tmp_path / "HEARTBEAT.md").write_text("Check inbox daily.", encoding="utf-8")
+        result = build_context_files_prompt(cwd=str(tmp_path))
+        assert "## HEARTBEAT.md" in result
+        assert "Check inbox daily." in result
+
+    def test_loads_cwd_tools_md(self, tmp_path):
+        (tmp_path / "TOOLS.md").write_text("Prefer pytest.", encoding="utf-8")
+        result = build_context_files_prompt(cwd=str(tmp_path))
+        assert "## TOOLS.md" in result
+        assert "pytest" in result
+
+    def test_loads_hermes_home_tools_md(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        (tmp_path / "TOOLS.md").write_text("Global tool hints from home.", encoding="utf-8")
+        result = build_context_files_prompt(cwd=str(tmp_path))
+        assert "Global tool hints from home." in result
+
+    def test_daily_memory_loads_today_and_yesterday(self, tmp_path, monkeypatch):
+        from datetime import datetime, timezone
+
+        import hermes_time
+
+        fixed = datetime(2026, 4, 3, 8, 0, 0, tzinfo=timezone.utc)
+        monkeypatch.setattr(hermes_time, "now", lambda: fixed)
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        daily_dir = tmp_path / "memory" / "daily"
+        daily_dir.mkdir(parents=True)
+        (daily_dir / "2026-04-03.md").write_text("Today note.", encoding="utf-8")
+        (daily_dir / "2026-04-02.md").write_text("Yesterday note.", encoding="utf-8")
+        result = build_context_files_prompt(cwd=str(tmp_path))
+        assert "## Daily memory" in result
+        assert "Today note." in result
+        assert "Yesterday note." in result
+
+    def test_cron_platform_skips_heartbeat_and_daily_memory(self, tmp_path, monkeypatch):
+        from datetime import datetime, timezone
+
+        import hermes_time
+
+        fixed = datetime(2026, 4, 3, 8, 0, 0, tzinfo=timezone.utc)
+        monkeypatch.setattr(hermes_time, "now", lambda: fixed)
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        (tmp_path / "HEARTBEAT.md").write_text("heartbeat cron should skip", encoding="utf-8")
+        (tmp_path / "TOOLS.md").write_text("tools still load for cron.", encoding="utf-8")
+        daily_dir = tmp_path / "memory" / "daily"
+        daily_dir.mkdir(parents=True)
+        (daily_dir / "2026-04-03.md").write_text("daily cron should skip", encoding="utf-8")
+        result = build_context_files_prompt(cwd=str(tmp_path), platform="cron")
+        assert "heartbeat cron should skip" not in result
+        assert "daily cron should skip" not in result
+        assert "tools still load for cron." in result
+
+    def test_cron_platform_match_is_case_insensitive(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        (tmp_path / "HEARTBEAT.md").write_text("skip me", encoding="utf-8")
+        result = build_context_files_prompt(cwd=str(tmp_path), platform="CRON")
+        assert "skip me" not in result
+
+
+
 # =========================================================================
 # .hermes.md helper functions
 # =========================================================================

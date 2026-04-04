@@ -30,6 +30,11 @@ from hermes_cli.setup import (
 
 logger = logging.getLogger(__name__)
 
+# Max chars of archived IDENTITY.md to print after migration (suggested merge into SOUL.md).
+_IDENTITY_PREVIEW_MAX_CHARS = 8000
+# BOOTSTRAP is first-run only — short preview so users can turn it into a one-off skill.
+_BOOTSTRAP_PREVIEW_MAX_CHARS = 2500
+
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 _OPENCLAW_SCRIPT = (
@@ -296,6 +301,10 @@ def _cmd_migrate(args):
     # Print results
     _print_migration_report(report, dry_run)
 
+    if not dry_run:
+        _maybe_print_archived_identity_hint(report)
+        _maybe_print_archived_bootstrap_hint(report)
+
     # After successful non-dry-run migration, offer to archive the source directory
     if not dry_run and report.get("summary", {}).get("migrated", 0) > 0:
         _offer_source_archival(source_dir, getattr(args, "yes", False))
@@ -457,6 +466,87 @@ def _cmd_cleanup(args):
         print_info("Directories were renamed, not deleted. You can undo by renaming them back.")
     else:
         print_info("No directories were archived.")
+
+
+def _maybe_print_archived_identity_hint(report: dict) -> None:
+    """If migration archived workspace IDENTITY.md, print a suggested paste for SOUL.md."""
+    od = report.get("output_dir")
+    if not od:
+        return
+    base = Path(od) / "archive"
+    candidates = [
+        base / "workspace" / "IDENTITY.md",
+        base / "workspace.default" / "IDENTITY.md",
+    ]
+    identity_path = next((p for p in candidates if p.is_file()), None)
+    if not identity_path:
+        return
+    try:
+        content = identity_path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return
+    if not content:
+        return
+
+    print()
+    print_header("Archived IDENTITY.md — merge into SOUL.md")
+    print_info("Hermes has no separate IDENTITY.md. Add the text below under a ## Identity heading (or merge into your existing SOUL.md).")
+    print_info(f"Source: {identity_path}")
+    print()
+    preview = content
+    if len(preview) > _IDENTITY_PREVIEW_MAX_CHARS:
+        preview = (
+            preview[:_IDENTITY_PREVIEW_MAX_CHARS].rstrip()
+            + "\n\n[... truncated — edit from the archive file above ...]"
+        )
+    print(color("--- suggested paste (edit freely) ---", Colors.DIM))
+    print(preview)
+    print(color("--- end suggested paste ---", Colors.DIM))
+    print()
+    soul = get_hermes_home() / "SOUL.md"
+    print_info(f"Typical target: {soul}")
+
+
+def _maybe_print_archived_bootstrap_hint(report: dict) -> None:
+    """If migration archived BOOTSTRAP.md, explain first-run skill workflow (never persistent prompt)."""
+    od = report.get("output_dir")
+    if not od:
+        return
+    base = Path(od) / "archive"
+    candidates = [
+        base / "workspace" / "BOOTSTRAP.md",
+        base / "workspace.default" / "BOOTSTRAP.md",
+    ]
+    bootstrap_path = next((p for p in candidates if p.is_file()), None)
+    if not bootstrap_path:
+        return
+    try:
+        content = bootstrap_path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return
+    if not content:
+        return
+
+    print()
+    print_header("Archived BOOTSTRAP.md — first-run only (not a standing prompt)")
+    print_info(
+        "Hermes does not inject BOOTSTRAP.md on every session. "
+        "Turn this into a one-time skill, run it once, then remove or archive the skill."
+    )
+    print_info("Suggested path: ~/.hermes/skills/openclaw-bootstrap/SKILL.md (or a profile under HERMES_HOME/skills/)")
+    print_info(f"Source: {bootstrap_path}")
+    print()
+    preview = content
+    if len(preview) > _BOOTSTRAP_PREVIEW_MAX_CHARS:
+        preview = (
+            preview[:_BOOTSTRAP_PREVIEW_MAX_CHARS].rstrip()
+            + "\n\n[... truncated — copy from archive file ...]"
+        )
+    print(color("--- content reference (paste into SKILL.md body if useful) ---", Colors.DIM))
+    print(preview)
+    print(color("--- end reference ---", Colors.DIM))
+    print()
+    print_info("See: https://hermes-agent.nousresearch.com/docs/guides/openclaw-hermes-security-profiles")
 
 
 def _print_migration_report(report: dict, dry_run: bool):
