@@ -71,8 +71,16 @@ result
 website/static/api/skills-index.json
 models-dev-upstream/
 
+# Cursor / IDE (local workspace, rules, plans)
+.cursor/
+hermes-agent.code-workspace
+
+# OpenMemory / local assistant artifacts (project root)
+openmemory.md
+gitdiff_01.md
+gitstatus.md
+
 # OpenMemory - IDE/Assistant specific rules
-.cursor/rules/openmemory.mdc
 AGENTS.md
 
 # Copied OpenClaw repo
