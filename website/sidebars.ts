@@ -557,6 +557,8 @@ const sidebars: SidebarsConfig = {
         'guides/migrate-from-openclaw',
         'guides/aws-bedrock',
         'guides/azure-foundry',
+        'guides/openclaw-hermes-hybrid',
+        'guides/openclaw-hermes-security-profiles',
       ],
     },
     {
