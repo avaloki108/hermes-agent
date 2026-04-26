@@ -950,6 +950,42 @@ display:
 #     base_url: "https://ollama.com/v1"
 
 # =============================================================================
+# Morph LLM (optional — OpenAI-compatible API + Morph MCP)
+# =============================================================================
+# Full walkthrough: website/docs/guides/morph-morphllm.md
+#
+# model:
+#   provider: custom
+#   base_url: "https://api.morphllm.com/v1"
+#   default: "<MORPH_MODEL_ID>"
+#   api_key: "${MORPH_API_KEY}"
+#
+# compression:
+#   summary_provider: main
+#
+# auxiliary:
+#   vision: { provider: main }
+#   web_extract: { provider: main }
+#   compression: { provider: main, timeout: 120 }
+#   session_search: { provider: main }
+#   skills_hub: { provider: main }
+#   approval: { provider: main }
+#   mcp: { provider: main }
+#   flush_memories: { provider: main }
+#
+# memory:
+#   provider: honcho
+#
+# mcp_servers:
+#   morph:
+#     command: "npx"
+#     args: ["-y", "@morphllm/morphmcp"]
+#     env:
+#       MORPH_API_KEY: "${MORPH_API_KEY}"
+#       ENABLED_TOOLS: "edit_file,warpgrep_codebase_search"
+#     timeout: 120
+
+# =============================================================================
 # Privacy
 # =============================================================================
 # privacy:
