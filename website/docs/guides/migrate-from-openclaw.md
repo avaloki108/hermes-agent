@@ -8,6 +8,23 @@ description: "Complete guide to migrating your OpenClaw / Clawdbot setup to Herm
 
 `hermes claw migrate` imports your OpenClaw (or legacy Clawdbot/Moldbot) setup into Hermes. This guide covers exactly what gets migrated, the config key mappings, and what to verify after migration.
 
+## After migration: hybrid model (OpenClaw-style identity)
+
+OpenClaw keeps persona, instructions, and optional daily notes in **one workspace directory**. Hermes splits **profile-global** files (`SOUL.md`, memories, skills under `HERMES_HOME`) from **project** context (`AGENTS.md` from your working directory). To map old habits to Hermes — including `IDENTITY.md` → `SOUL.md`, `HEARTBEAT.md` → cron + skills, and multi-persona setups via [profiles](/docs/user-guide/profiles) — read **[OpenClaw and Hermes hybrid model](/docs/guides/openclaw-hermes-hybrid)**.
+
+### Compatibility mapping (archived workspace files)
+
+After migration, OpenClaw-only files may live under **`archive/workspace/`** (or `archive/workspace.default/`). Use this checklist:
+
+| Archived file | What to do in Hermes |
+|---------------|----------------------|
+| **`IDENTITY.md`** | Merge into **`HERMES_HOME/SOUL.md`** (e.g. under `## Identity`). After a non-dry-run migrate, the CLI prints a **suggested paste** from the archive. |
+| **`TOOLS.md`** | Copy to **repo `TOOLS.md`** or **`HERMES_HOME/TOOLS.md`**, or merge into **`AGENTS.md`** — see [context files](/docs/user-guide/features/context-files). Hermes injects `TOOLS.md` with caps; it is not a second prompt system. |
+| **`HEARTBEAT.md`** | Copy to **`HERMES_HOME/HEARTBEAT.md`** and/or convert to a **skill** + [`hermes cron`](/docs/user-guide/features/cron). Scheduled runs use `platform=cron`, which **skips** injected heartbeat and daily notes so prompts stay small. |
+| **`BOOTSTRAP.md`** | **Do not** add to the standing system prompt. Turn into a **one-time skill** (run once, then remove or archive). After migrate, the CLI explains this and shows a **content reference** if `BOOTSTRAP.md` was archived. |
+
+For security-research-oriented profile layouts (recon / web2 / web3), see **[OpenClaw-style security profiles](/docs/guides/openclaw-hermes-security-profiles)**.
+
 ## Quick start
 
 ```bash
