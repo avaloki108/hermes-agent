@@ -606,6 +606,9 @@ automatically scope to the active profile.
 
 ## Known Pitfalls
 
+### Avoid large nested repos or huge `node_modules` inside the checkout
+Nested project trees under the repo root (for example a full sibling checkout with a large `node_modules`) can break or massively slow editable installs (`uv pip install -e .`, `pip install -e .`): setuptools may burn CPU for a long time during metadata steps, and a second concurrent `uv pip install` can wait on an exclusive lock under the uv cache editable build directory. Prefer sibling directories outside this tree, or remove unneeded `node_modules` before packaging installs.
+
 ### DO NOT hardcode `~/.hermes` paths
 Use `get_hermes_home()` from `hermes_constants` for code paths. Use `display_hermes_home()`
 for user-facing print/log messages. Hardcoding `~/.hermes` breaks profiles — each profile

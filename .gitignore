@@ -81,6 +81,7 @@ gitdiff_01.md
 gitstatus.md
 
 # OpenMemory - IDE/Assistant specific rules
+.cursor/rules/openmemory.mdc
 AGENTS.md
 
 # Copied OpenClaw repo
