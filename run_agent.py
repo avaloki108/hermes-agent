@@ -13684,4 +13684,7 @@ def main(
 
 
 if __name__ == "__main__":
+    # Lazy import so `import run_agent` (e.g. tests) does not require optional `fire`.
+    import fire
+
     fire.Fire(main)

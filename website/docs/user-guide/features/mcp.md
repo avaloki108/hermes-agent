@@ -543,6 +543,7 @@ The gateway does NOT need to be running for read operations (listing conversatio
 
 ## Related docs
 
+- [Morph (MorphLLM) as primary provider](/docs/guides/morph-morphllm)
 - [Use MCP with Hermes](/docs/guides/use-mcp-with-hermes)
 - [CLI Commands](/docs/reference/cli-commands)
 - [Slash Commands](/docs/reference/slash-commands)

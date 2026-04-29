@@ -20,6 +20,7 @@ All variables go in `~/.hermes/.env`. You can also set them with `hermes config 
 | `AI_GATEWAY_BASE_URL` | Override AI Gateway base URL (default: `https://ai-gateway.vercel.sh/v1`) |
 | `OPENAI_API_KEY` | API key for custom OpenAI-compatible endpoints (used with `OPENAI_BASE_URL`) |
 | `OPENAI_BASE_URL` | Base URL for custom endpoint (VLLM, SGLang, etc.) |
+| `MORPH_API_KEY` | MorphLLM API key ([morphllm.com](https://morphllm.com)) — use in `model.api_key: "${MORPH_API_KEY}"` for `https://api.morphllm.com/v1`, and in `mcp_servers` env for `@morphllm/morphmcp` |
 | `COPILOT_GITHUB_TOKEN` | GitHub token for Copilot API — first priority (OAuth `gho_*` or fine-grained PAT `github_pat_*`; classic PATs `ghp_*` are **not supported**) |
 | `GH_TOKEN` | GitHub token — second priority for Copilot (also used by `gh` CLI) |
 | `GITHUB_TOKEN` | GitHub token — third priority for Copilot |

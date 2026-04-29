@@ -543,6 +543,7 @@ const sidebars: SidebarsConfig = {
         'guides/team-telegram-assistant',
         'guides/python-library',
         'guides/use-mcp-with-hermes',
+        'guides/morph-morphllm',
         'guides/use-soul-with-hermes',
         'guides/use-voice-mode-with-hermes',
         'guides/build-a-hermes-plugin',
@@ -556,6 +557,8 @@ const sidebars: SidebarsConfig = {
         'guides/migrate-from-openclaw',
         'guides/aws-bedrock',
         'guides/azure-foundry',
+        'guides/openclaw-hermes-hybrid',
+        'guides/openclaw-hermes-security-profiles',
       ],
     },
     {
