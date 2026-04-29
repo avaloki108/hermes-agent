@@ -109,7 +109,7 @@ This means your existing Cursor conventions automatically apply when using Herme
 
 Context files are loaded by `build_context_files_prompt()` in `agent/prompt_builder.py`:
 
-1. **Scan working directory** — checks for `.hermes.md` → `AGENTS.md` → `CLAUDE.md` → `.cursorrules` (first match wins)
+1. **At session start** — scans the working directory (and reads global files from `HERMES_HOME`), checking `.hermes.md` → `AGENTS.md` → `CLAUDE.md` → `.cursorrules` (first match wins)
 2. **Content is read** — each file is read as UTF-8 text
 3. **Security scan** — content is checked for prompt injection patterns
 4. **Truncation** — project context files use 20,000 characters (head/tail truncated); `HEARTBEAT.md`, `TOOLS.md`, and daily memory use separate caps (see Size Limits)
