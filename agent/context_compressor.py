@@ -48,6 +48,7 @@ SUMMARY_PREFIX = (
     "config, etc.) may reflect work described here — avoid repeating it:"
 )
 LEGACY_SUMMARY_PREFIX = "[CONTEXT SUMMARY]:"
+PERSISTENT_INVARIANT_MARKER = "[PERSISTENT CONTEXT INVARIANT]"
 
 # Minimum tokens for the summary output
 _MIN_SUMMARY_TOKENS = 2000
@@ -146,6 +147,50 @@ def _append_text_to_content(content: Any, text: str, *, prepend: bool = False) -
         return [text_block, *content] if prepend else [*content, text_block]
     rendered = str(content)
     return text + rendered if prepend else rendered + text
+
+
+def _extract_persistent_context_invariants(messages: List[Dict[str, Any]]) -> str:
+    """Extract user-marked invariants that must survive compaction.
+
+    Any message containing ``[PERSISTENT CONTEXT INVARIANT]`` contributes the
+    text after that marker.  This gives tools/skills a provider-agnostic way to
+    protect hard constraints (scope, read-only rules, falsification gates) from
+    lossy summarization without promoting the old turn into an instruction to
+    re-run completed work.
+    """
+    invariants: list[str] = []
+    for msg in messages:
+        text = _content_text_for_contains(msg.get("content"))
+        if PERSISTENT_INVARIANT_MARKER not in text:
+            continue
+        fragment = text.split(PERSISTENT_INVARIANT_MARKER, 1)[1].strip()
+        if fragment:
+            invariants.append(fragment)
+    if not invariants:
+        return ""
+    # Deduplicate while preserving first-seen order.
+    seen: set[str] = set()
+    unique: list[str] = []
+    for item in invariants:
+        if item not in seen:
+            unique.append(item)
+            seen.add(item)
+    return "\n\n".join(unique)
+
+
+def _append_persistent_invariants(summary: str, invariants: str) -> str:
+    """Append extracted invariants to a compaction summary exactly once."""
+    if not invariants:
+        return summary
+    block = (
+        "\n\n## Persistent Context Invariants\n"
+        "These constraints/objectives were explicitly marked persistent before "
+        "compression. Treat them as guardrails, not as a request to redo old work.\n"
+        f"{invariants}"
+    )
+    if "## Persistent Context Invariants" in summary:
+        return summary
+    return summary + block
 
 
 def _truncate_tool_call_args_json(args: str, head_chars: int = 200) -> str:
@@ -1290,6 +1335,7 @@ The user has requested that this compaction PRIORITISE preserving all informatio
             return messages
 
         turns_to_summarize = messages[compress_start:compress_end]
+        persistent_invariants = _extract_persistent_context_invariants(messages)
 
         if not self.quiet_mode:
             logger.info(
@@ -1345,6 +1391,8 @@ The user has requested that this compaction PRIORITISE preserving all informatio
                 f"messages contained earlier work in this session. Continue based on the "
                 f"recent messages below and the current state of any files or resources."
             )
+
+        summary = _append_persistent_invariants(summary, persistent_invariants)
 
         _merge_summary_into_tail = False
         last_head_role = messages[compress_start - 1].get("role", "user") if compress_start > 0 else "user"

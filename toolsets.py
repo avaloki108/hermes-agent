@@ -47,7 +47,7 @@ _HERMES_CORE_TOOLS = [
     # Text-to-speech
     "text_to_speech",
     # Planning & memory
-    "todo", "memory",
+    "todo", "memory", "mythos_hunt",
     # Session history search
     "session_search",
     # Clarifying questions
@@ -103,6 +103,12 @@ TOOLSETS = {
         "includes": []
     },
     
+    "bounty": {
+        "description": "Web3 bug bounty hunting workflow tools",
+        "tools": ["mythos_hunt"],
+        "includes": []
+    },
+
     "skills": {
         "description": "Access, create, edit, and manage skill documents with specialized instructions and knowledge",
         "tools": ["skills_list", "skill_view", "skill_manage"],
