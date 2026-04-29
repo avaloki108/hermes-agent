@@ -59,6 +59,24 @@ class TestCompress:
     def _make_messages(self, n):
         return [{"role": "user" if i % 2 == 0 else "assistant", "content": f"msg {i}"} for i in range(n)]
 
+    def test_persistent_context_invariant_survives_compression(self, compressor):
+        msgs = [
+            {"role": "system", "content": "System prompt"},
+            {"role": "user", "content": "start"},
+            {"role": "assistant", "content": "ok"},
+            {"role": "user", "content": "[PERSISTENT CONTEXT INVARIANT]\nTarget: Doppler\nConstraint: source is read-only\nFalsification before report"},
+            *self._make_messages(10),
+            {"role": "user", "content": "latest task"},
+            {"role": "assistant", "content": "working"},
+        ]
+
+        result = compressor.compress(msgs)
+        rendered = "\n".join(str(m.get("content", "")) for m in result)
+        assert "Persistent Context Invariants" in rendered
+        assert "Target: Doppler" in rendered
+        assert "source is read-only" in rendered
+        assert "Falsification before report" in rendered
+
     def test_too_few_messages_returns_unchanged(self, compressor):
         msgs = self._make_messages(4)  # protect_first=2 + protect_last=2 + 1 = 5 needed
         result = compressor.compress(msgs)
