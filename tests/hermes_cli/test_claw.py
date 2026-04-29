@@ -526,6 +526,13 @@ class TestCmdMigrate:
 class TestCmdCleanup:
     """Test the cleanup command handler."""
 
+    @pytest.fixture(autouse=True)
+    def _mock_openclaw_running(self):
+        # Mock process detection so tests work even when OpenClaw is running on the host.
+        # Without this, _cmd_cleanup() aborts early if it detects a real OpenClaw service.
+        with patch.object(claw_mod, "_detect_openclaw_processes", return_value=[]):
+            yield
+
     def test_no_dirs_found(self, tmp_path, capsys):
         args = Namespace(source=None, dry_run=False, yes=False)
         with patch.object(claw_mod, "_find_openclaw_dirs", return_value=[]):
